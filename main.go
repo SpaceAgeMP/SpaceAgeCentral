@@ -32,8 +32,24 @@ func broadcast(msg []byte) {
 	socketLock.RUnlock()
 }
 
+func serverList() []string {
+	socketLock.RLock()
+	list := make([]string, 0, len(sockets))
+	for name := range sockets {
+		list = append(list, name)
+	}
+	socketLock.RUnlock()
+	return list
+}
+
 type identResp struct {
 	Name string `json:"name"`
+}
+
+type serverListResp struct {
+	Ident   string   `json:"ident"`
+	Command string   `json:"command"`
+	List    []string `json:"list"`
 }
 
 func getIdent(w http.ResponseWriter, r *http.Request) string {
@@ -105,6 +121,15 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		decoded["ident"] = ident
 
 		encoded, err := json.Marshal(decoded)
+
+		cmd, ok := decoded["command"].(string)
+		if ok && cmd == "servers" {
+			go c.WriteJSON(&serverListResp{
+				Ident:   "CENTRAL",
+				Command: cmd,
+				List:    serverList(),
+			})
+		}
 
 		target, ok := decoded["target"].(string)
 		if ok {
