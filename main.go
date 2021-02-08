@@ -121,6 +121,8 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	sockets = make(map[string]*websocket.Conn)
+
 	http.HandleFunc("/ws/central", wshandler)
 	err := http.ListenAndServe("127.0.0.1:9888", nil)
 	if err != nil {
