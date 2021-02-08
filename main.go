@@ -54,6 +54,20 @@ type serverListResp struct {
 	List    []string `json:"list"`
 }
 
+type errorResp struct {
+	Ident   string `json:"ident"`
+	Command string `json:"command"`
+	Error   string `json:"error"`
+}
+
+func sendError(c *websocket.Conn, err error) {
+	c.WriteJSON(&errorResp{
+		Ident:   "CENTRAL",
+		Command: "error",
+		Error:   err.Error(),
+	})
+}
+
 func getIdent(w http.ResponseWriter, r *http.Request) string {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.spaceage.mp/v2/servers/self", nil)
