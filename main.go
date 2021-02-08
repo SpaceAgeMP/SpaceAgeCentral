@@ -129,6 +129,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 				Command: cmd,
 				List:    serverList(),
 			})
+			continue
 		}
 
 		target, ok := decoded["target"].(string)
