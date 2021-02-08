@@ -134,6 +134,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		decoded := make(map[string]interface{})
 		err := c.ReadJSON(&decoded)
 		if err != nil {
+			sendError(c, err)
 			break
 		}
 		decoded["ident"] = ident
