@@ -48,28 +48,33 @@ func makeServerList() {
 }
 
 type identResp struct {
+	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
 type pingResp struct {
+	ID      string `json:"id"`
 	Ident   string `json:"ident"`
 	Command string `json:"command"`
 }
 
 type serverListResp struct {
+	ID      string   `json:"id"`
 	Ident   string   `json:"ident"`
 	Command string   `json:"command"`
 	List    []string `json:"list"`
 }
 
 type errorResp struct {
+	ID      string `json:"id"`
 	Ident   string `json:"ident"`
 	Command string `json:"command"`
 	Error   string `json:"error"`
 }
 
-func sendError(c *websocket.Conn, err error) {
+func sendError(c *websocket.Conn, id string, err error) {
 	c.WriteJSON(&errorResp{
+		ID:      id,
 		Ident:   centralIdent,
 		Command: "error",
 		Error:   err.Error(),
@@ -142,46 +147,61 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		decoded := make(map[string]interface{})
 		err := c.ReadJSON(&decoded)
 		if err != nil {
-			sendError(c, err)
+			sendError(c, "UNKNOWN", err)
 			break
 		}
 		decoded["ident"] = ident
 
 		encoded, err := json.Marshal(decoded)
 
-		target, ok := decoded["target"].(string)
+		id, ok := decoded["id"].(string)
+		if !ok {
+			sendError(c, "UNKNOWN", errors.New("No ID"))
+			continue
+		}
 
-		if ok && target == centralIdent {
-			cmd, ok := decoded["command"].(string)
-			if !ok {
-				sendError(c, errors.New("No command"))
-				continue
-			}
+		target, targetOk := decoded["target"].(string)
+		cmd, cmdOk := decoded["command"].(string)
 
+		if !cmdOk || cmd == "" {
+			sendError(c, id, errors.New("No command"))
+			continue
+		}
+
+		if targetOk && target == centralIdent {
 			if cmd == "servers" {
 				go c.WriteJSON(&serverListResp{
+					ID:      id,
 					Ident:   centralIdent,
 					Command: cmd,
 					List:    serverList,
 				})
-				continue
 			} else if cmd == "ping" {
 				go c.WriteJSON(&pingResp{
+					ID:      id,
 					Ident:   centralIdent,
 					Command: "pong",
 				})
 			} else if cmd == "pong" {
 				// Go pong, ignore it...
 			} else {
-				sendError(c, errors.New("Invalid command"))
+				sendError(c, id, errors.New("Invalid command"))
 			}
+			continue
 		}
 
-		if ok {
+		if targetOk && target != "" {
 			log.Printf("[> %s] %s", target, encoded)
 			go sendTo(target, encoded)
 		} else {
 			log.Printf("[>>>] %s", encoded)
+			if cmd == "ping" {
+				go c.WriteJSON(&pingResp{
+					ID:      id,
+					Ident:   centralIdent,
+					Command: "pong",
+				})
+			}
 			go broadcast(encoded)
 		}
 	}
