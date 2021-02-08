@@ -14,6 +14,8 @@ var upgrader = websocket.Upgrader{}
 var socketLock sync.RWMutex
 var sockets map[string]*websocket.Conn
 
+var serverList []string
+
 func sendTo(target string, msg []byte) {
 	socketLock.RLock()
 	socket := sockets[target]
@@ -32,14 +34,14 @@ func broadcast(msg []byte) {
 	socketLock.RUnlock()
 }
 
-func serverList() []string {
+func makeServerList() {
 	socketLock.RLock()
 	list := make([]string, 0, len(sockets))
 	for name := range sockets {
 		list = append(list, name)
 	}
 	socketLock.RUnlock()
-	return list
+	serverList = list
 }
 
 type identResp struct {
@@ -102,6 +104,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 	}
 	sockets[ident] = c
 	socketLock.Unlock()
+	makeServerList()
 
 	defer func() {
 		socketLock.Lock()
@@ -109,6 +112,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 			delete(sockets, ident)
 		}
 		socketLock.Unlock()
+		makeServerList()
 	}()
 	defer c.Close()
 
@@ -127,7 +131,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 			go c.WriteJSON(&serverListResp{
 				Ident:   "CENTRAL",
 				Command: cmd,
-				List:    serverList(),
+				List:    serverList,
 			})
 			continue
 		}
@@ -145,6 +149,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	sockets = make(map[string]*websocket.Conn)
+	makeServerList()
 
 	http.HandleFunc("/ws/central", wshandler)
 	err := http.ListenAndServe("127.0.0.1:9888", nil)
