@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"sync"
 
@@ -106,8 +107,10 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 
 		target, ok := decoded["target"].(string)
 		if ok {
+			log.Printf("[> %s] %s", target, encoded)
 			go sendTo(target, encoded)
 		} else {
+			log.Printf("[>>>] %s", encoded)
 			go broadcast(encoded)
 		}
 	}
