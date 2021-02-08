@@ -141,6 +141,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		ID:      "ID_WELCOME",
 		Ident:   centralIdent,
 		Command: "welcome",
+		Data:    centralIdent,
 	})
 
 	for {
@@ -184,10 +185,10 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 				go c.WriteJSON(&simpleResp{
 					ID:      id,
 					Ident:   centralIdent,
-					Command: "pong",
+					Command: "reply",
 				})
-			} else if cmd == "pong" {
-				// Go pong, ignore it...
+			} else if cmd == "reply" {
+				// Go reply, ignore it...
 			} else {
 				sendError(c, id, errors.New("Invalid command"))
 			}
@@ -203,7 +204,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 				go c.WriteJSON(&simpleResp{
 					ID:      id,
 					Ident:   centralIdent,
-					Command: "pong",
+					Command: "reply",
 				})
 			}
 			go broadcast(encoded)
