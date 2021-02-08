@@ -115,7 +115,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 			go sendTo(target, encoded)
 		} else {
 			log.Printf("[>>>] %s", encoded)
-			go broadcast(encoded)
+			go broadcast(ident, encoded)
 		}
 	}
 }
