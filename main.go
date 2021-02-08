@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"sync"
@@ -15,6 +16,8 @@ var socketLock sync.RWMutex
 var sockets map[string]*websocket.Conn
 
 var serverList []string
+
+const centralIdent = "CENTRAL"
 
 func sendTo(target string, msg []byte) {
 	socketLock.RLock()
@@ -48,6 +51,11 @@ type identResp struct {
 	Name string `json:"name"`
 }
 
+type pingResp struct {
+	Ident   string `json:"ident"`
+	Command string `json:"command"`
+}
+
 type serverListResp struct {
 	Ident   string   `json:"ident"`
 	Command string   `json:"command"`
@@ -62,7 +70,7 @@ type errorResp struct {
 
 func sendError(c *websocket.Conn, err error) {
 	c.WriteJSON(&errorResp{
-		Ident:   "CENTRAL",
+		Ident:   centralIdent,
 		Command: "error",
 		Error:   err.Error(),
 	})
@@ -141,17 +149,34 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 
 		encoded, err := json.Marshal(decoded)
 
-		cmd, ok := decoded["command"].(string)
-		if ok && cmd == "servers" {
-			go c.WriteJSON(&serverListResp{
-				Ident:   "CENTRAL",
-				Command: cmd,
-				List:    serverList,
-			})
-			continue
+		target, ok := decoded["target"].(string)
+
+		if ok && target == centralIdent {
+			cmd, ok := decoded["command"].(string)
+			if !ok {
+				sendError(c, errors.New("No command"))
+				continue
+			}
+
+			if cmd == "servers" {
+				go c.WriteJSON(&serverListResp{
+					Ident:   centralIdent,
+					Command: cmd,
+					List:    serverList,
+				})
+				continue
+			} else if cmd == "ping" {
+				go c.WriteJSON(&pingResp{
+					Ident:   centralIdent,
+					Command: "pong",
+				})
+			} else if cmd == "pong" {
+				// Go pong, ignore it...
+			} else {
+				sendError(c, errors.New("Invalid command"))
+			}
 		}
 
-		target, ok := decoded["target"].(string)
 		if ok {
 			log.Printf("[> %s] %s", target, encoded)
 			go sendTo(target, encoded)
