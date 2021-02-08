@@ -17,7 +17,7 @@ var sockets map[string]*websocket.Conn
 
 var serverList []string
 
-const centralIdent = "CENTRAL"
+const centralIdent = "Geminga"
 
 func sendTo(target string, msg []byte) {
 	socketLock.RLock()
