@@ -52,7 +52,7 @@ type identResp struct {
 	Name string `json:"name"`
 }
 
-type pingResp struct {
+type simpleResp struct {
 	ID      string `json:"id"`
 	Ident   string `json:"ident"`
 	Command string `json:"command"`
@@ -143,6 +143,12 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 	}()
 	defer c.Close()
 
+	go c.WriteJSON(&simpleResp{
+		ID:      "ID_WELCOME",
+		Ident:   centralIdent,
+		Command: "welcome",
+	})
+
 	for {
 		decoded := make(map[string]interface{})
 		err := c.ReadJSON(&decoded)
@@ -181,7 +187,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 					List:    serverList,
 				})
 			} else if cmd == "ping" {
-				go c.WriteJSON(&pingResp{
+				go c.WriteJSON(&simpleResp{
 					ID:      id,
 					Ident:   centralIdent,
 					Command: "pong",
@@ -200,7 +206,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Printf("[>>>] %s", encoded)
 			if cmd == "ping" {
-				go c.WriteJSON(&pingResp{
+				go c.WriteJSON(&simpleResp{
 					ID:      id,
 					Ident:   centralIdent,
 					Command: "pong",
