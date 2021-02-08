@@ -160,12 +160,16 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		target, targetOk := decoded["target"].(string)
 		cmd, cmdOk := decoded["command"].(string)
 
 		if !cmdOk || cmd == "" {
 			sendError(c, id, errors.New("No command"))
 			continue
+		}
+
+		target, targetOk := decoded["target"].(string)
+		if targetOk && target == "" {
+			targetOk = false
 		}
 
 		if targetOk && target == centralIdent {
@@ -190,7 +194,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if targetOk && target != "" {
+		if targetOk {
 			log.Printf("[> %s] %s", target, encoded)
 			go sendTo(target, encoded)
 		} else {
