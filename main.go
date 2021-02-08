@@ -47,7 +47,7 @@ func makeServerList() {
 	serverList = list
 }
 
-type identResp struct {
+type identHTTPResp struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
@@ -56,28 +56,22 @@ type simpleResp struct {
 	ID      string `json:"id"`
 	Ident   string `json:"ident"`
 	Command string `json:"command"`
+	Data    string `json:"data"`
 }
 
-type serverListResp struct {
+type simpleArrayResp struct {
 	ID      string   `json:"id"`
 	Ident   string   `json:"ident"`
 	Command string   `json:"command"`
-	List    []string `json:"list"`
-}
-
-type errorResp struct {
-	ID      string `json:"id"`
-	Ident   string `json:"ident"`
-	Command string `json:"command"`
-	Error   string `json:"error"`
+	Data    []string `json:"data"`
 }
 
 func sendError(c *websocket.Conn, id string, err error) {
-	c.WriteJSON(&errorResp{
+	c.WriteJSON(&simpleResp{
 		ID:      id,
 		Ident:   centralIdent,
 		Command: "error",
-		Error:   err.Error(),
+		Data:    err.Error(),
 	})
 }
 
@@ -100,7 +94,7 @@ func getIdent(w http.ResponseWriter, r *http.Request) string {
 		return ""
 	}
 
-	var respData identResp
+	var respData identHTTPResp
 	err = json.NewDecoder(resp.Body).Decode(&respData)
 	resp.Body.Close()
 	if err != nil {
@@ -180,11 +174,11 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 
 		if targetOk && target == centralIdent {
 			if cmd == "servers" {
-				go c.WriteJSON(&serverListResp{
+				go c.WriteJSON(&simpleArrayResp{
 					ID:      id,
 					Ident:   centralIdent,
 					Command: cmd,
-					List:    serverList,
+					Data:    serverList,
 				})
 			} else if cmd == "ping" {
 				go c.WriteJSON(&simpleResp{
