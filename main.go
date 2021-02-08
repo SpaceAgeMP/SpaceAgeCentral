@@ -24,9 +24,12 @@ func sendTo(target string, msg []byte) {
 	socket.WriteMessage(websocket.TextMessage, msg)
 }
 
-func broadcast(msg []byte) {
+func broadcast(from string, msg []byte) {
 	socketLock.RLock()
-	for _, socket := range sockets {
+	for ident, socket := range sockets {
+		if from == ident {
+			continue
+		}
 		go socket.WriteMessage(websocket.TextMessage, msg)
 	}
 	socketLock.RUnlock()
@@ -84,6 +87,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		delete(sockets, ident)
 		go oldC.Close()
 	}
+	sockets[ident] = c
 	socketLock.Unlock()
 
 	defer func() {
