@@ -24,12 +24,9 @@ func sendTo(target string, msg []byte) {
 	socket.WriteMessage(websocket.TextMessage, msg)
 }
 
-func broadcast(from string, msg []byte) {
+func broadcast(msg []byte) {
 	socketLock.RLock()
-	for ident, socket := range sockets {
-		if from == ident {
-			continue
-		}
+	for _, socket := range sockets {
 		go socket.WriteMessage(websocket.TextMessage, msg)
 	}
 	socketLock.RUnlock()
@@ -115,7 +112,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 			go sendTo(target, encoded)
 		} else {
 			log.Printf("[>>>] %s", encoded)
-			go broadcast(ident, encoded)
+			go broadcast(encoded)
 		}
 	}
 }
