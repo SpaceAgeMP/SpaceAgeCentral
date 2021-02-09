@@ -138,11 +138,11 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 	}()
 	defer c.Close()
 
-	c.WriteJSON(&simpleArrayResp{
+	c.WriteJSON(&simpleResp{
 		ID:      "ID_WELCOME",
 		Ident:   centralIdent,
 		Command: "welcome",
-		Data:    []string{centralIdent, ident},
+		Data:    ident,
 	})
 
 	for {
