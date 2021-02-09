@@ -70,6 +70,15 @@ func sendError(c *websocket.Conn, id string, err error) {
 	})
 }
 
+func sendReply(c *websocket.Conn, id string, data interface{}) {
+	c.WriteJSON(&wsMesg{
+		ID:      id,
+		Ident:   centralIdent,
+		Command: "reply",
+		Data:    data,
+	})
+}
+
 func getIdent(w http.ResponseWriter, r *http.Request) string {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.spaceage.mp/v2/servers/self", nil)
@@ -160,18 +169,9 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 
 		if *decoded.Target == centralIdent {
 			if decoded.Command == "servers" {
-				c.WriteJSON(&wsMesg{
-					ID:      decoded.ID,
-					Ident:   centralIdent,
-					Command: "reply",
-					Data:    serverList,
-				})
+				sendReply(c, decoded.ID, serverList)
 			} else if decoded.Command == "ping" {
-				c.WriteJSON(&wsMesg{
-					ID:      decoded.ID,
-					Ident:   centralIdent,
-					Command: "reply",
-				})
+				sendReply(c, decoded.ID, nil)
 			} else if decoded.Command == "reply" {
 				// Go reply, ignore it...
 			} else {
@@ -193,11 +193,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[>>>] %s", encoded)
 			go broadcast(encoded)
 			if decoded.Command == "ping" {
-				c.WriteJSON(&wsMesg{
-					ID:      decoded.ID,
-					Ident:   centralIdent,
-					Command: "reply",
-				})
+				sendReply(c, decoded.ID, nil)
 			}
 		}
 	}
