@@ -53,22 +53,16 @@ type identHTTPResp struct {
 	Name string `json:"name"`
 }
 
-type simpleResp struct {
-	ID      string `json:"id"`
-	Ident   string `json:"ident"`
-	Command string `json:"command"`
-	Data    string `json:"data"`
-}
-
-type simpleArrayResp struct {
-	ID      string   `json:"id"`
-	Ident   string   `json:"ident"`
-	Command string   `json:"command"`
-	Data    []string `json:"data"`
+type wsMesg struct {
+	ID      string      `json:"id"`
+	Target  *string     `json:"target"`
+	Ident   string      `json:"ident"`
+	Command string      `json:"command"`
+	Data    interface{} `json:"data"`
 }
 
 func sendError(c *websocket.Conn, id string, err error) {
-	c.WriteJSON(&simpleResp{
+	c.WriteJSON(&wsMesg{
 		ID:      id,
 		Ident:   centralIdent,
 		Command: "error",
@@ -138,7 +132,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 	}()
 	defer c.Close()
 
-	c.WriteJSON(&simpleResp{
+	c.WriteJSON(&wsMesg{
 		ID:      "ID_WELCOME",
 		Ident:   centralIdent,
 		Command: "welcome",
@@ -146,69 +140,61 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	for {
-		decoded := make(map[string]interface{})
+		var decoded wsMesg
 		err := c.ReadJSON(&decoded)
 		if err != nil {
 			sendError(c, "UNKNOWN", err)
 			break
 		}
-		decoded["ident"] = ident
+		decoded.Ident = ident
 
-		encoded, err := json.Marshal(decoded)
-
-		id, ok := decoded["id"].(string)
-		if !ok {
+		if decoded.ID == "" {
 			sendError(c, "UNKNOWN", errors.New("No ID"))
 			continue
 		}
 
-		cmd, cmdOk := decoded["command"].(string)
-
-		if !cmdOk || cmd == "" {
-			sendError(c, id, errors.New("No command"))
+		if decoded.Command == "" {
+			sendError(c, decoded.ID, errors.New("No command"))
 			continue
 		}
 
-		target, targetOk := decoded["target"].(string)
-		if targetOk && target == "" {
-			targetOk = false
-		}
-
-		if targetOk && target == centralIdent {
-			if cmd == "servers" {
-				c.WriteJSON(&simpleArrayResp{
-					ID:      id,
+		if *decoded.Target == centralIdent {
+			if decoded.Command == "servers" {
+				c.WriteJSON(&wsMesg{
+					ID:      decoded.ID,
 					Ident:   centralIdent,
-					Command: cmd,
+					Command: "reply",
 					Data:    serverList,
 				})
-			} else if cmd == "ping" {
-				c.WriteJSON(&simpleResp{
-					ID:      id,
+			} else if decoded.Command == "ping" {
+				c.WriteJSON(&wsMesg{
+					ID:      decoded.ID,
 					Ident:   centralIdent,
 					Command: "reply",
 				})
-			} else if cmd == "reply" {
+			} else if decoded.Command == "reply" {
 				// Go reply, ignore it...
 			} else {
-				sendError(c, id, errors.New("Invalid command"))
+				sendError(c, decoded.ID, errors.New("Invalid command"))
 			}
 			continue
 		}
 
-		if targetOk {
-			if sendTo(target, encoded) {
-				log.Printf("[> %s] %s", target, encoded)
+		encoded, err := json.Marshal(decoded)
+
+		if decoded.Target != nil {
+			if sendTo(*decoded.Target, encoded) {
+				log.Printf("[> %s] %s", *decoded.Target, encoded)
 			} else {
-				log.Printf("[> %s ???] %s", target, encoded)
-				sendError(c, id, errors.New("No server found with ident"))
+				log.Printf("[> %s ???] %s", *decoded.Target, encoded)
+				sendError(c, decoded.ID, errors.New("No server found with ident"))
 			}
 		} else {
 			log.Printf("[>>>] %s", encoded)
 			go broadcast(encoded)
-			if cmd == "ping" {
-				c.WriteJSON(&simpleResp{
-					ID:      id,
+			if decoded.Command == "ping" {
+				c.WriteJSON(&wsMesg{
+					ID:      decoded.ID,
 					Ident:   centralIdent,
 					Command: "reply",
 				})
