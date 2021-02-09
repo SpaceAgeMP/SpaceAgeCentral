@@ -121,6 +121,13 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c.WriteJSON(&wsMesg{
+		ID:      "ID_DUMMY",
+		Ident:   centralIdent,
+		Command: "welcome",
+		Data:    ident,
+	})
+
 	socketLock.Lock()
 	oldC := sockets[ident]
 	if oldC != nil {
@@ -153,13 +160,6 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		go broadcast(d)
 	}()
 	defer c.Close()
-
-	c.WriteJSON(&wsMesg{
-		ID:      "ID_DUMMY",
-		Ident:   centralIdent,
-		Command: "welcome",
-		Data:    ident,
-	})
 
 	d, _ := json.Marshal(&wsMesg{
 		ID:      "ID_DUMMY",
