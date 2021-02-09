@@ -167,7 +167,12 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if *decoded.Target == centralIdent {
+		target := ""
+		if decoded.Target != nil {
+			target = *decoded.Target
+		}
+
+		if target == centralIdent {
 			if decoded.Command == "servers" {
 				sendReply(c, decoded.ID, serverList)
 			} else if decoded.Command == "ping" {
@@ -182,7 +187,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 
 		encoded, err := json.Marshal(decoded)
 
-		if decoded.Target != nil {
+		if target != "" {
 			if sendTo(*decoded.Target, encoded) {
 				log.Printf("[> %s] %s", *decoded.Target, encoded)
 			} else {
