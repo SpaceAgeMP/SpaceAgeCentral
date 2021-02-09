@@ -121,6 +121,10 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	handleServerConn(ident, c)
+}
+
+func handleServerConn(ident string, c *websocket.Conn) {
 	c.WriteJSON(&wsMesg{
 		ID:      "ID_DUMMY",
 		Ident:   centralIdent,
