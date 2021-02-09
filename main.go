@@ -132,21 +132,42 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 	makeServerList()
 
 	defer func() {
+		sendServerLeave := false
 		socketLock.Lock()
 		if sockets[ident] == c {
 			delete(sockets, ident)
+			sendServerLeave = true
 		}
 		socketLock.Unlock()
 		makeServerList()
+
+		if !sendServerLeave {
+			return
+		}
+		d, _ := json.Marshal(&wsMesg{
+			ID:      "ID_DUMMY",
+			Ident:   centralIdent,
+			Command: "serverleave",
+			Data:    ident,
+		})
+		go broadcast(d)
 	}()
 	defer c.Close()
 
 	c.WriteJSON(&wsMesg{
-		ID:      "ID_WELCOME",
+		ID:      "ID_DUMMY",
 		Ident:   centralIdent,
 		Command: "welcome",
 		Data:    ident,
 	})
+
+	d, _ := json.Marshal(&wsMesg{
+		ID:      "ID_DUMMY",
+		Ident:   centralIdent,
+		Command: "serverjoin",
+		Data:    ident,
+	})
+	go broadcast(d)
 
 	for {
 		var decoded wsMesg
