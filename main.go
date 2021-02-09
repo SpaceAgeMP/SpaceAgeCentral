@@ -229,7 +229,7 @@ func main() {
 	sockets = make(map[string]*websocket.Conn)
 	makeServerList()
 
-	http.HandleFunc("/ws/central", wshandler)
+	http.HandleFunc("/ws/server", wshandler)
 	err := http.ListenAndServe("127.0.0.1:9888", nil)
 	if err != nil {
 		panic(err)
