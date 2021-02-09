@@ -19,14 +19,15 @@ var serverList []string
 
 const centralIdent = "Geminga"
 
-func sendTo(target string, msg []byte) {
+func sendTo(target string, msg []byte) bool {
 	socketLock.RLock()
 	socket := sockets[target]
 	socketLock.RUnlock()
 	if socket == nil {
-		return
+		return false
 	}
-	socket.WriteMessage(websocket.TextMessage, msg)
+	go socket.WriteMessage(websocket.TextMessage, msg)
+	return true
 }
 
 func broadcast(msg []byte) {
@@ -137,7 +138,7 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 	}()
 	defer c.Close()
 
-	go c.WriteJSON(&simpleResp{
+	c.WriteJSON(&simpleResp{
 		ID:      "ID_WELCOME",
 		Ident:   centralIdent,
 		Command: "welcome",
@@ -175,14 +176,14 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 
 		if targetOk && target == centralIdent {
 			if cmd == "servers" {
-				go c.WriteJSON(&simpleArrayResp{
+				c.WriteJSON(&simpleArrayResp{
 					ID:      id,
 					Ident:   centralIdent,
 					Command: cmd,
 					Data:    serverList,
 				})
 			} else if cmd == "ping" {
-				go c.WriteJSON(&simpleResp{
+				c.WriteJSON(&simpleResp{
 					ID:      id,
 					Ident:   centralIdent,
 					Command: "reply",
@@ -196,18 +197,22 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if targetOk {
-			log.Printf("[> %s] %s", target, encoded)
-			go sendTo(target, encoded)
+			if sendTo(target, encoded) {
+				log.Printf("[> %s] %s", target, encoded)
+			} else {
+				log.Printf("[> %s ???] %s", target, encoded)
+				sendError(c, id, errors.New("No server found with ident"))
+			}
 		} else {
 			log.Printf("[>>>] %s", encoded)
+			go broadcast(encoded)
 			if cmd == "ping" {
-				go c.WriteJSON(&simpleResp{
+				c.WriteJSON(&simpleResp{
 					ID:      id,
 					Ident:   centralIdent,
 					Command: "reply",
 				})
 			}
-			go broadcast(encoded)
 		}
 	}
 }
