@@ -49,8 +49,8 @@ func makeServerList() {
 }
 
 type identHTTPResp struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	Name   string `json:"name"`
+	Hidden bool   `json:"hidden"`
 }
 
 type wsMesg struct {
@@ -79,23 +79,23 @@ func sendReply(c *websocket.Conn, id string, data interface{}) {
 	})
 }
 
-func getIdent(w http.ResponseWriter, r *http.Request) string {
+func getIdent(w http.ResponseWriter, r *http.Request) (string, bool) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.spaceage.mp/v2/servers/self", nil)
 	if err != nil {
 		w.WriteHeader(400)
-		return ""
+		return "", false
 	}
 	req.Header.Add("Authorization", r.Header.Get("Authorization"))
 	resp, err := client.Do(req)
 	if err != nil {
 		w.WriteHeader(400)
-		return ""
+		return "", false
 	}
 
 	if resp.StatusCode != 200 {
 		w.WriteHeader(resp.StatusCode)
-		return ""
+		return "", false
 	}
 
 	var respData identHTTPResp
@@ -103,14 +103,14 @@ func getIdent(w http.ResponseWriter, r *http.Request) string {
 	resp.Body.Close()
 	if err != nil {
 		w.WriteHeader(500)
-		return ""
+		return "", false
 	}
 
-	return respData.Name
+	return respData.Name, respData.Hidden
 }
 
 func wshandler(w http.ResponseWriter, r *http.Request) {
-	ident := getIdent(w, r)
+	ident, hidden := getIdent(w, r)
 	if ident == "" {
 		return
 	}
@@ -121,10 +121,10 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handleServerConn(ident, c)
+	handleServerConn(ident, hidden, c)
 }
 
-func handleServerConn(ident string, c *websocket.Conn) {
+func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 	c.WriteJSON(&wsMesg{
 		ID:      "ID_DUMMY",
 		Ident:   centralIdent,
@@ -152,7 +152,7 @@ func handleServerConn(ident string, c *websocket.Conn) {
 		socketLock.Unlock()
 		makeServerList()
 
-		if !sendServerLeave {
+		if hidden || !sendServerLeave {
 			return
 		}
 		d, _ := json.Marshal(&wsMesg{
@@ -165,13 +165,15 @@ func handleServerConn(ident string, c *websocket.Conn) {
 	}()
 	defer c.Close()
 
-	d, _ := json.Marshal(&wsMesg{
-		ID:      "ID_DUMMY",
-		Ident:   centralIdent,
-		Command: "serverjoin",
-		Data:    ident,
-	})
-	go broadcast(d)
+	if !hidden {
+		d, _ := json.Marshal(&wsMesg{
+			ID:      "ID_DUMMY",
+			Ident:   centralIdent,
+			Command: "serverjoin",
+			Data:    ident,
+		})
+		go broadcast(d)
+	}
 
 	for {
 		var decoded wsMesg
@@ -213,7 +215,9 @@ func handleServerConn(ident string, c *websocket.Conn) {
 		encoded, err := json.Marshal(decoded)
 
 		if target != "" {
-			if sendTo(*decoded.Target, encoded) {
+			if hidden {
+				log.Printf("[> %s] %s", *decoded.Target, encoded)
+			} else if sendTo(*decoded.Target, encoded) {
 				log.Printf("[> %s] %s", *decoded.Target, encoded)
 			} else {
 				log.Printf("[> %s ???] %s", *decoded.Target, encoded)
@@ -221,7 +225,9 @@ func handleServerConn(ident string, c *websocket.Conn) {
 			}
 		} else {
 			log.Printf("[>>>] %s", encoded)
-			go broadcast(encoded)
+			if !hidden {
+				go broadcast(encoded)
+			}
 			if decoded.Command == "ping" {
 				sendReply(c, decoded.ID, nil)
 			}
