@@ -217,15 +217,14 @@ func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 
 		if target != "" {
 			if hidden {
-				log.Printf("[> %s] %s", *decoded.Target, encoded)
-			} else if sendTo(*decoded.Target, encoded) {
-				log.Printf("[> %s] %s", *decoded.Target, encoded)
-			} else {
+				continue
+			}
+
+			if !sendTo(*decoded.Target, encoded) {
 				log.Printf("[> %s ???] %s", *decoded.Target, encoded)
 				sendError(c, decoded.ID, errors.New("No server found with ident"))
 			}
 		} else {
-			log.Printf("[>>>] %s", encoded)
 			if !hidden {
 				go broadcast(encoded)
 			}
