@@ -132,9 +132,11 @@ func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 		Data:    ident,
 	})
 
+	serverAlreadyConnected := false
 	socketLock.Lock()
 	oldC := sockets[ident]
 	if oldC != nil {
+		serverAlreadyConnected = true
 		delete(sockets, ident)
 		go oldC.Close()
 	}
@@ -170,7 +172,7 @@ func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 	defer c.Close()
 
 	log.Printf("[+ %s] Server online", ident)
-	if !hidden {
+	if !serverAlreadyConnected && !hidden {
 		d, _ := json.Marshal(&wsMesg{
 			ID:      "ID_DUMMY",
 			Ident:   centralIdent,
