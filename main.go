@@ -180,6 +180,7 @@ func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 		err := c.ReadJSON(&decoded)
 		if err != nil {
 			sendError(c, "UNKNOWN", err)
+			log.Printf("[< %s] Error: %v", ident, err)
 			break
 		}
 		decoded.Ident = ident
