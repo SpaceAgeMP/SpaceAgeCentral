@@ -179,8 +179,8 @@ func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 		var decoded wsMesg
 		err := c.ReadJSON(&decoded)
 		if err != nil {
-			sendError(c, "UNKNOWN", err)
 			log.Printf("[< %s] Error: %v", ident, err)
+			sendError(c, "UNKNOWN", err)
 			break
 		}
 		decoded.Ident = ident
