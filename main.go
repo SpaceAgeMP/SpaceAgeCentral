@@ -152,6 +152,10 @@ func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 		socketLock.Unlock()
 		makeServerList()
 
+		if sendServerLeave {
+			log.Printf("[- %s] Server offline", ident)
+		}
+
 		if hidden || !sendServerLeave {
 			return
 		}
@@ -165,6 +169,7 @@ func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 	}()
 	defer c.Close()
 
+	log.Printf("[+ %s] Server online", ident)
 	if !hidden {
 		d, _ := json.Marshal(&wsMesg{
 			ID:      "ID_DUMMY",
