@@ -12,6 +12,8 @@ type wsMesg struct {
 
 type wsSocket struct {
 	c        *websocket.Conn
+	nextHop  string
 	isServer bool
+	hidden   bool
 	ident    string
 }

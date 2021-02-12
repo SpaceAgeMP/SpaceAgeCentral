@@ -80,31 +80,15 @@ func serverhandler(w http.ResponseWriter, r *http.Request) {
 func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
 	var sockStruct wsSocket
 	sockStruct.c = c
+	sockStruct.hidden = hidden
+	sockStruct.nextHop = ""
 	sockStruct.isServer = true
 	sockStruct.ident = ident
 
 	serverAlreadyConnected := handleConn(&sockStruct)
 
-	defer func() {
-		isThis := handleDisconn(&sockStruct)
-		if isThis {
-			log.Printf("[- %s] Server offline", ident)
-		}
+	defer handleDisconn(&sockStruct)
 
-		if hidden || !isThis {
-			return
-		}
-		d, _ := json.Marshal(&wsMesg{
-			ID:      "ID_DUMMY",
-			Ident:   centralIdent,
-			Command: "serverleave",
-			Data:    ident,
-		})
-		go broadcast(d)
-	}()
-	defer c.Close()
-
-	log.Printf("[+ %s] Server online", ident)
 	if !serverAlreadyConnected && !hidden {
 		d, _ := json.Marshal(&wsMesg{
 			ID:      "ID_DUMMY",

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -19,21 +21,26 @@ var centralIdent = "UNSET"
 
 func sendTo(target string, msg []byte) bool {
 	socketLock.RLock()
+	defer socketLock.RUnlock()
+
 	socket := sockets[target]
-	socketLock.RUnlock()
 	if socket == nil {
 		return false
+	}
+	if socket.c == nil {
+		socket = sockets[socket.nextHop]
+		if socket == nil {
+			return false
+		}
 	}
 	go socket.c.WriteMessage(websocket.TextMessage, msg)
 	return true
 }
 
 func broadcast(msg []byte) {
-	socketLock.RLock()
-	for _, socket := range sockets {
-		go socket.c.WriteMessage(websocket.TextMessage, msg)
+	for name := range sockets {
+		go sendTo(name, msg)
 	}
-	socketLock.RUnlock()
 }
 
 func handleDisconn(obj *wsSocket) bool {
@@ -45,6 +52,29 @@ func handleDisconn(obj *wsSocket) bool {
 	}
 	socketLock.Unlock()
 	makeServerList()
+	if obj.c != nil {
+		obj.c.Close()
+	}
+
+	if isThis {
+		typ := "Central"
+		if obj.isServer {
+			typ = "Server"
+		}
+		log.Printf("[+ %s] %s offline", obj.ident, typ)
+	}
+
+	if !obj.isServer || obj.hidden || !isThis {
+		return isThis
+	}
+	d, _ := json.Marshal(&wsMesg{
+		ID:      "ID_DUMMY",
+		Ident:   centralIdent,
+		Command: "serverleave",
+		Data:    obj.ident,
+	})
+	go broadcast(d)
+
 	return isThis
 }
 
@@ -68,14 +98,22 @@ func handleConn(obj *wsSocket) bool {
 	socketLock.Unlock()
 	makeServerList()
 
+	typ := "Central"
+	if obj.isServer {
+		typ = "Server"
+	}
+	log.Printf("[+ %s] %s online", obj.ident, typ)
+
 	return alreadyConnected
 }
 
 func makeServerList() {
 	socketLock.RLock()
 	list := make([]string, 0, len(sockets))
-	for name := range sockets {
-		list = append(list, name)
+	for name, sock := range sockets {
+		if sock.isServer {
+			list = append(list, name)
+		}
 	}
 	socketLock.RUnlock()
 	serverList = list
