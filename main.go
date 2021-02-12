@@ -88,7 +88,7 @@ func main() {
 	makeServerList()
 
 	http.HandleFunc("/ws/server", serverhandler)
-	http.HandleFunc("/ws/interlink", interlinkhandler)
+	//http.HandleFunc("/ws/interlink", interlinkhandler)
 	err := http.ListenAndServe("127.0.0.1:9888", nil)
 	if err != nil {
 		panic(err)
