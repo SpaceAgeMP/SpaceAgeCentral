@@ -11,7 +11,7 @@ import (
 var upgrader = websocket.Upgrader{}
 
 var socketLock sync.RWMutex
-var sockets map[string]*websocket.Conn
+var sockets map[string]*wsSocket
 
 var serverList []string
 
@@ -24,47 +24,47 @@ func sendTo(target string, msg []byte) bool {
 	if socket == nil {
 		return false
 	}
-	go socket.WriteMessage(websocket.TextMessage, msg)
+	go socket.c.WriteMessage(websocket.TextMessage, msg)
 	return true
 }
 
 func broadcast(msg []byte) {
 	socketLock.RLock()
 	for _, socket := range sockets {
-		go socket.WriteMessage(websocket.TextMessage, msg)
+		go socket.c.WriteMessage(websocket.TextMessage, msg)
 	}
 	socketLock.RUnlock()
 }
 
-func handleDisconn(c *websocket.Conn, ident string) bool {
+func handleDisconn(obj *wsSocket) bool {
 	isThis := false
 	socketLock.Lock()
-	if sockets[ident] == c {
+	if sockets[obj.ident] == obj {
 		isThis = true
-		delete(sockets, ident)
+		delete(sockets, obj.ident)
 	}
 	socketLock.Unlock()
 	makeServerList()
 	return isThis
 }
 
-func handleConn(c *websocket.Conn, ident string) bool {
-	c.WriteJSON(&wsMesg{
+func handleConn(obj *wsSocket) bool {
+	obj.c.WriteJSON(&wsMesg{
 		ID:      "ID_DUMMY",
 		Ident:   centralIdent,
 		Command: "welcome",
-		Data:    ident,
+		Data:    obj.ident,
 	})
 
 	alreadyConnected := false
 	socketLock.Lock()
-	oldC := sockets[ident]
+	oldC := sockets[obj.ident]
 	if oldC != nil {
 		alreadyConnected = true
-		delete(sockets, ident)
-		go oldC.Close()
+		delete(sockets, obj.ident)
+		go oldC.c.Close()
 	}
-	sockets[ident] = c
+	sockets[obj.ident] = obj
 	socketLock.Unlock()
 	makeServerList()
 
@@ -84,7 +84,7 @@ func makeServerList() {
 func main() {
 	centralIdent = os.Getenv("NAME")
 
-	sockets = make(map[string]*websocket.Conn)
+	sockets = make(map[string]*wsSocket)
 	makeServerList()
 
 	http.HandleFunc("/ws/server", serverhandler)

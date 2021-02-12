@@ -78,10 +78,15 @@ func serverhandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
-	serverAlreadyConnected := handleConn(c, ident)
+	var sockStruct wsSocket
+	sockStruct.c = c
+	sockStruct.isServer = true
+	sockStruct.ident = ident
+
+	serverAlreadyConnected := handleConn(&sockStruct)
 
 	defer func() {
-		isThis := handleDisconn(c, ident)
+		isThis := handleDisconn(&sockStruct)
 		if isThis {
 			log.Printf("[- %s] Server offline", ident)
 		}
