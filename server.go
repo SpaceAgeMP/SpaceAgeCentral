@@ -62,7 +62,7 @@ func getIdent(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return respData.Name, respData.Hidden
 }
 
-func wshandler(w http.ResponseWriter, r *http.Request) {
+func serverhandler(w http.ResponseWriter, r *http.Request) {
 	ident, hidden := getIdent(w, r)
 	if ident == "" {
 		return
@@ -78,40 +78,15 @@ func wshandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleServerConn(ident string, hidden bool, c *websocket.Conn) {
-	c.WriteJSON(&wsMesg{
-		ID:      "ID_DUMMY",
-		Ident:   centralIdent,
-		Command: "welcome",
-		Data:    ident,
-	})
-
-	serverAlreadyConnected := false
-	socketLock.Lock()
-	oldC := sockets[ident]
-	if oldC != nil {
-		serverAlreadyConnected = true
-		delete(sockets, ident)
-		go oldC.Close()
-	}
-	sockets[ident] = c
-	socketLock.Unlock()
-	makeServerList()
+	serverAlreadyConnected := handleConn(c, ident)
 
 	defer func() {
-		sendServerLeave := false
-		socketLock.Lock()
-		if sockets[ident] == c {
-			delete(sockets, ident)
-			sendServerLeave = true
-		}
-		socketLock.Unlock()
-		makeServerList()
-
-		if sendServerLeave {
+		isThis := handleDisconn(c, ident)
+		if isThis {
 			log.Printf("[- %s] Server offline", ident)
 		}
 
-		if hidden || !sendServerLeave {
+		if hidden || !isThis {
 			return
 		}
 		d, _ := json.Marshal(&wsMesg{

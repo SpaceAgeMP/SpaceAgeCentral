@@ -36,6 +36,41 @@ func broadcast(msg []byte) {
 	socketLock.RUnlock()
 }
 
+func handleDisconn(c *websocket.Conn, ident string) bool {
+	isThis := false
+	socketLock.Lock()
+	if sockets[ident] == c {
+		isThis = true
+		delete(sockets, ident)
+	}
+	socketLock.Unlock()
+	makeServerList()
+	return isThis
+}
+
+func handleConn(c *websocket.Conn, ident string) bool {
+	c.WriteJSON(&wsMesg{
+		ID:      "ID_DUMMY",
+		Ident:   centralIdent,
+		Command: "welcome",
+		Data:    ident,
+	})
+
+	alreadyConnected := false
+	socketLock.Lock()
+	oldC := sockets[ident]
+	if oldC != nil {
+		alreadyConnected = true
+		delete(sockets, ident)
+		go oldC.Close()
+	}
+	sockets[ident] = c
+	socketLock.Unlock()
+	makeServerList()
+
+	return alreadyConnected
+}
+
 func makeServerList() {
 	socketLock.RLock()
 	list := make([]string, 0, len(sockets))
@@ -52,7 +87,8 @@ func main() {
 	sockets = make(map[string]*websocket.Conn)
 	makeServerList()
 
-	http.HandleFunc("/ws/server", wshandler)
+	http.HandleFunc("/ws/server", serverhandler)
+	http.HandleFunc("/ws/interlink", interlinkhandler)
 	err := http.ListenAndServe("127.0.0.1:9888", nil)
 	if err != nil {
 		panic(err)
